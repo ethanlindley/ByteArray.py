@@ -1,5 +1,6 @@
-import math
-import numpy as np
+import math  # Used for writeInt64
+import struct  # Used for ByteArray
+import numpy as np  # Used for util functions
 
 class Buffer:
     def __init__(self, array=[0] * 1024, offset=0, endian=0, debug=0):
@@ -148,6 +149,129 @@ class Buffer:
     def readInt8(self):
         self.offset = self.offset >> 0
         return self.array[self.offset-1]
+
+class ByteArray:
+    def __init__(this, bytes=""):
+        this.bytes = bytes
+
+    def isUnicode(this, value):
+        if type(value) == unicode:
+            value = value.encode("utf-8")
+            return value
+        pass
+
+    def writeByte(this, value):
+        this.isUnicode(value)
+        this.bytes += pack("!b", int(value)) # Offset: 1
+        return this.bytes
+
+    def writeUnsignedByte(this, value):
+        this.isUnicode(value)
+        this.bytes += pack("!B", int(value)) # Offset: 1
+        return this.bytes
+
+    def writeShort(this, value):
+        this.isUnicode(value)
+        this.bytes += pack("!h", int(value)) # Offset: 2
+        return this.bytes
+
+    def writeUnsignedShort(this, value):
+        this.isUnicode(value)
+        this.bytes += pack("!H", int(value)) # Offset: 2
+        return this.bytes
+
+    def writeInt(this, value):
+        this.isUnicode(value)
+        this.bytes += pack("!i", int(value)) # Offset: 4
+        return this.bytes
+
+    def writeUnsignedInt(this, value):
+        this.isUnicode(value)
+        this.bytes += pack("!I", int(value)) # Offset: 4
+        return this.bytes
+
+    def writeBoolean(this, value):
+        this.isUnicode(value)
+        this.bytes += pack("!?", int(value)) # Offset: 1
+        return this.bytes
+
+    def writeUTF(this, value):
+        this.isUnicode(value)
+        value = str(value)
+        size = len(value)
+        this.writeShort(size) # Offset: 2
+        this.write(value) # Offset: 2 + 1 = 3
+        return this.bytes
+
+    def writeUTFBytes(this, value, size):
+        this.isUnicode(value)
+        for data in str(pack("!b", 0)) * int(size):
+            if len(value) < int(size):
+                value = value + pack("!b", 0)
+        this.write(value)
+        return this.bytes
+
+    def writeBytes(this, value):
+        this.bytes += value
+        return this.bytes
+
+    def write(this, value):
+        this.bytes += value
+
+    def readByte(this):
+        value = unpack('!b', this.bytes[:1])[0]
+        this.bytes = this.bytes[1:]
+        return value
+
+    def readUnsignedByte(this):
+        value = unpack('!B', this.bytes[:1])[0]
+        this.bytes = this.bytes[1:]
+        return value
+
+    def readShort(this):
+        value = unpack('!h', this.bytes[:2])[0]
+        this.bytes = this.bytes[2:]
+        return value
+
+    def readUnsignedShort(this):
+        value = unpack('!H', this.bytes[:2])[0]
+        this.bytes = this.bytes[2:]
+        return value
+
+    def readInt(this):
+        value = unpack('!i', this.bytes[:4])[0]
+        this.bytes = this.bytes[4:]
+        return value
+
+    def readUnsignedInt(this):
+        value = unpack('!I', this.bytes[:4])[0]
+        this.bytes = this.bytes[4:]
+        return value
+
+    def readUTF(this):
+        size = unpack('!h', this.bytes[:2])[0]
+        value = this.bytes[2:2 + size]
+        this.bytes = this.bytes[size + 2:]
+        return value
+
+    def readBoolean(this):
+        value = unpack('!?', this.bytes[:1])[0]
+        this.bytes = this.bytes[1:]
+        return (True if value == 1 else False)
+
+    def readUTFBytes(this, size):
+        value = this.bytes[:int(size)]
+        this.bytes = this.bytes[int(size):]
+        return value
+
+    def getLength(this):
+        return len(this.bytes)
+
+    def bytesAvailable(this):
+        return len(this.bytes) > 0
+
+    def toByteArray(this):
+        return this.bytes
 
 b = Buffer()
 b.writeInt40(1)
