@@ -29,8 +29,24 @@ class Buffer:
     def getWrittenBytes(self):
         return np.array(self.array)[np.array(self.array) > 0]  # Values higher than 0
 
+    def getLengthBeforeByte(self, byte):
+        return self.array[:self.array.index(byte)]
+
+    def accurateBytesAvailable(self, byte):
+        totalLength = len(self.getLengthBeforeByte(byte))
+        return self.bytesAvailable() + totalLength
+
+    def skipByte(self, amountToSkip):
+        self.offset += amountToSkip
+
     def fillStream(self, numberToFill):
         self.array = self.array[numberToFill] * 1024  # Fills the byte stream with 1024 "numberToFill"
+
+    def fixStream(self):  # This was a temporary fix that is not being used
+        if self.offset > len(self.array):
+            self.array += [0] * int(self.offset - len(self.array))
+        else:
+            return self.array
 
     def toString(self):
         print "Current offset: " + str(self.offset)  # Prints offset
@@ -44,12 +60,6 @@ class Buffer:
         else:
             print "Endian: Little endian (1)"
         print "Bytes available: " + str(self.bytesAvailable())  # 1024 - self.offset
-
-    def fixStream(self):  # This was a temporary fix that is not being used
-        if self.offset > len(self.array):
-            self.array += [0] * int(self.offset - len(self.array))
-        else:
-            return self.array
 
     def writeInt8(self, value):
         self.array.insert(self.offset, value & 0xff)
@@ -82,7 +92,7 @@ class Buffer:
         self.offset += 3
         return self.toString()
 
-    def writeInt32(self, value):
+    def writeInt32(self, value):  # I don't know why but Little endian bytes go to the fifth offset in the byte stream? This also seems to be the same in Node.js
         value = +value
         self.offset = self.offset >> 0
         if self.endian == 0:
@@ -90,45 +100,37 @@ class Buffer:
             self.array.insert(self.offset + 1, value >> 16)
             self.array.insert(self.offset + 2, value >> 8)
             self.array.insert(self.offset + 3, value & 0xff)
+            self.offset += 4
         else:
+            self.offset += 4
             self.array.insert(self.offset, value & 0xFF)
             self.array.insert(self.offset + 1, value >> 8)
             self.array.insert(self.offset + 2, value >> 16)
             self.array.insert(self.offset + 3, value >> 24)
-        self.offset += 4
         return self.toString()
 
-    def writeInt40BE(self, value):
+    def writeInt40(self, value):
         value = +value
         self.offset = self.offset >> 0
-        self.offset += 1
-        if self.endian == 0:
-            self.writeInt32(int(value))
-        else:
-            print "BigEndian only"
+        self.offset += 1  # writeInt8
+        self.writeInt32(int(value))
         return self.toString()
 
-    def writeInt48BE(self, value):
+    def writeInt48(self, value):
         value = +value
         self.offset = self.offset >> 0
-        self.offset += 2
-        if self.endian == 0:
-            self.writeInt32(int(value))
-        else:
-            print "BigEndian only"
+        self.offset += 2  # writeInt16
+        self.writeInt32(int(value))
         return self.toString()
 
-    def writeInt56BE(self, value):
+    def writeInt56(self, value):
         value = +value
         self.offset = self.offset >> 0
-        self.offset += 3
-        if self.endian == 0:
-            self.writeInt32(int(value))
-        else:
-            print "BigEndian only"
+        self.offset += 3  # writeInt24
+        self.writeInt32(int(value))
         return self.toString()
 
-    def writeInt64(self, value):  # Little endian compatible, because we use Int32 twice with the same offset (4+4=8)
+    def writeInt64(self, value):  # The byte does not get overwritten in the byte stream, because we use Int32 twice with the same offset (4+4=8)
         value = +value
         self.offset = self.offset >> 0
         if self.endian == 0:
@@ -140,9 +142,12 @@ class Buffer:
             SHIFT_RIGHT_32 = 1 / (1 << 16) * (1 << 16)
             if value < 0x8000000000000000:
                 self.writeInt32(int(value & -1))
-                self.writeInt32(int(math.floor(value * SHIFT_RIGHT_32)))
+                self.writeInt32(int(math.floor(value * SHIFT_RIGHT_32)))  # Kills any float values
         return self.toString()
 
     def readInt8(self):
         self.offset = self.offset >> 0
-        return self.array[0]
+        return self.array[self.offset-1]
+
+b = Buffer()
+b.writeInt40(1)
