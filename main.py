@@ -75,8 +75,8 @@ class ByteArray(Exception):
         return buf
 
     def setPosition(self, pos):
-        if pos >= self.length:
-            raise ByteArrayException,"set position out of stream"
+        #if pos >= self.length:
+            #raise ByteArrayException,"set position out of stream"
         self.position = pos
         self.availableSizes = self.length - self.position
 
