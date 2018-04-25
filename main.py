@@ -1,277 +1,288 @@
-import math  # Used for writeInt64
-import struct  # Used for ByteArray
-import numpy as np  # Used for util functions
+#-*-coding:utf-8-*-
+import struct
+import math
+import zlib
 
-class Buffer:
-    def __init__(self, array=[0] * 1024, offset=0, endian=0, debug=0):
-        self.array = array  # Defaults to 1024, when debug is false (0), self.array is printed with a length of 256
-        self.offset = offset  # Defaults to [0]
-        self.endian = endian  # Defaults to BigEndian (0)
-        self.debug = debug  # Defaults to false (0)
+class ByteArrayException(Exception):
+    def __init__(self, msg):
+        Exception.__init__(self, msg)
 
-    def getStream(self):
-        return self.array
+class ByteArray(Exception):
+    LITTLE_ENDIAN = 0
+    BIG_ENDIAN = 1
 
-    def getOffset(self):
-        return self.offset
+    def __init__(self, buf=None):
+        self.stream = ""
+        self.position = 0
+        self.endian = ByteArray.BIG_ENDIAN
+        self.length = 0
+        self.availableSizes = 0
 
-    def getEndian(self):
-        return self.endian
-
-    def getDebug(self):
-        return self.debug
+        if not buf:
+            pass
+        elif type(buf) == ByteArray:
+            buf.setPosition(0)
+            self.writeMulitiBytes(buf)
+        elif type(buf)== str:
+            self.stream = buf
+            self.length = len(buf)
+            self.availableSizes = self.length
+        else:
+            print("[warning][ByteArray]buf type not supported")
 
     def bytesAvailable(self):
-        length = 1024 - self.offset
-        if length == 0:
-            print "Byte stream is full"  # The offset is 1024, but there's a chance the byte stream is NOT full, just nothing to write to
-        return length
+        return len(self.stream) > 0
 
-    def getWrittenBytes(self):
-        return np.array(self.array)[np.array(self.array) > 0]  # Values higher than 0
+    def toByteArray(self):
+        return self.stream
 
-    def getLengthBeforeByte(self, byte):
-        return self.array[:self.array.index(byte)]
+    def convertStream(self):
+        return [ord(c) for c in self.toByteArray()]
 
-    def accurateBytesAvailable(self, byte):
-        totalLength = len(self.getLengthBeforeByte(byte))
-        return self.bytesAvailable() + totalLength
+    def __readStream(self, size):
+        buf = ""
+        if self.availableSizes < size:  # If you have issues with this error, comment it out
+            raise ByteArrayException,"availableSizes=%d,size=%d.stream availableSizes not endian%"%(self.availableSizes)
+        if size == 0:
+            return buf
+        buf = self.stream[self.position:self.position+size]
+        self.position += size
+        self.availableSizes = self.length - self.position
+        return buf
 
-    def skipByte(self, amountToSkip):
-        self.offset += amountToSkip
+    def __unpackStream(self, fmt, data):
+        format = ""
+        format += fmt
+        buf = struct.unpack(format, data)
+        return buf[0]
 
-    def fillStream(self, numberToFill):
-        self.array = self.array[numberToFill] * 1024  # Fills the byte stream with 1024 "numberToFill"
+    def __writeStream(self, buf):
+        head = self.stream[:self.position]
+        end = self.stream[self.position:]
+        self.stream = head + buf +end
+        self.length = len(self.stream)
+        self.position += len(buf)
+        self.availableSizes = self.length - self.position
 
-    def fixStream(self):  # This was a temporary fix that is not being used
-        if self.offset > len(self.array):
-            self.array += [0] * int(self.offset - len(self.array))
+    def __packStream(self, fmt, data):
+        format = ""
+        if self.endian == ByteArray.BIG_ENDIAN:
+            format += ">"
         else:
-            return self.array
+            format += "<"
+        format += fmt
+        buf = struct.pack(format, data)
+        return buf
 
-    def toString(self):
-        print "Current offset: " + str(self.offset)  # Prints offset
-        if self.debug == 0:
-            print "256 length byte stream: " + str(self.array[0:len(self.array) / 4])  # Length of 256
+    def setPosition(self, pos):
+        if pos >= self.length:
+            raise ByteArrayException,"set position out of stream"
+        self.position = pos
+        self.availableSizes = self.length - self.position
+
+    def getvalue(self):
+        return self.stream
+
+    def compress(self):
+        lbuf = self.stream[:self.position]
+        rbuf = self.stream[self.position:]
+        rbuf = zlib.compress(rbuf)
+        self.stream = lbuf + rbuf
+
+    def decompress(self):
+        lbuf = self.stream[:self.position]
+        rbuf = self.stream[self.position:]
+        rbuf = zlib.compress(rbuf)
+        self.stream = lbuf + rbuf
+
+    def readByte(self):
+        buf = self.__readStream(1)
+        res = self.__unpackStream('b', buf)
+        return res
+
+    def readBoolean(self):
+        buf = self.__readStream(1)
+        res = self.__unpackStream("?", buf)
+        return (True if res == 1 else False)
+
+    def readUnsignedByte(self):
+        buf = self.__readStream(1)
+        res = self.__unpackStream('B', buf)
+        return res
+
+    def readShort(self):
+        buf = self.__readStream(2)
+        res = self.__unpackStream('h', buf)
+        return res
+
+    def readUnsignedShort(self):
+        buf = self.__readStream(2)
+        res = self.__unpackStream('H', buf)
+        return res
+
+    def readLong(self):
+        buf = self.__readStream(4)
+        res = self.__unpackStream("l", buf)
+        return res
+
+    def readUnsignedLong(self):
+        buf = self.__readStream(4)
+        res = self.__unpackStream("L", buf)
+        return res
+
+    def readInt(self):
+        buf = self.__readStream(4)
+        res = self.__unpackStream('i', buf)
+        return res
+
+    def readUnsignedInt(self):
+        buf = self.__readStream(4)
+        res = self.__unpackStream('I', buf)
+        return res
+
+    def readInt64(self):
+        buf = self.__readStream(8)
+        res = self.__unpackStream('q', buf)
+        return res
+
+    def readUnsignedInt64(self):
+        buf = self.__readStream(8)
+        res = self.__unpackStream('Q', buf)
+        return res
+
+    def readFloat(self):
+        buf = self.__readStream(4)
+        res = self.__unpackStream('f', buf)
+        return res
+
+    def readDouble(self):
+        buf = self.__readStream(8)
+        res = self.__unpackStream('d', buf)
+        return res
+
+    def readUTF(self, nlen):
+        buf = self.readShort()
+        return self.readUTFBytes(nlen)
+
+    def readUTFBytes(self, nlen):
+        buf = self.__readStream(nlen)
+        res = self.__unpackStream("%s"%nlen, buf)
+        return res
+
+    def readMulitiBytes(self, bytes, begin=0, nlen=-1):
+        if bytes.length < begin:
+            raise ByteArrayException,"Write ByteArray position out"
+        bytes.setPosition(begin)
+        if nlen == -1:
+            nlen = self.availableSizes
+        bytes.readBytes(nlen)
+
+    def readBytes(self, nlen):
+        buf = self.__readStream(nlen)
+        return buf
+
+    def readBytesWithLength(self):
+        length = self.readUnsignedInt()
+        if length == 0xffffffff:
+            return b""
+        return self.__readStream(length)
+
+    def readString(self):
+        buf = self.readBytesWithLength()
+        if self.endian == ByteArray.BIG_ENDIAN:
+            return buf.decode("utf-16be")
         else:
-            print "Byte stream: " + str(self.array)  # Full byte stream, 1024 length
-        print "Written bytes: " + str(self.getWrittenBytes())  # Prints values in the byte stream that are higher than 0
-        if self.endian == 0:
-            print "Endian: Big endian (0)"
-        else:
-            print "Endian: Little endian (1)"
-        print "Bytes available: " + str(self.bytesAvailable())  # 1024 - self.offset
+            return buf.decode("utf-16le")
 
-    def writeInt8(self, value):
-        self.array.insert(self.offset, value & 0xff)
-        self.offset += 1
-        return self.toString()
+    def writeByte(self, value):
+        buf = self.__packStream("b", value)
+        self.__writeStream(buf)
 
-    def writeInt16(self, value):
-        value = +value
-        self.offset = self.offset >> 0
-        if self.endian == 0:
-            self.array.insert(self.offset, value >> 8)
-            self.array.insert(self.offset + 1, value & 0xff)
-        else:
-            self.array.insert(self.offset, value & 0xff)
-            self.array.insert(self.offset + 1, value >> 8)
-        self.offset += 2
-        return self.toString()
+    def writeBoolean(self, value):
+        buf = self.__packStream("?", bool(value))
+        self.__writeStream(buf)
 
-    def writeInt24(self, value):
-        value = +value
-        self.offset = self.offset >> 0
-        if self.endian == 0:
-            self.array.insert(self.offset, value >> 16)
-            self.array.insert(self.offset + 1, value >> 8)
-            self.array.insert(self.offset + 2, value & 0xff)
-        else:
-            self.array.insert(self.offset, value & 0xff)
-            self.array.insert(self.offset + 1, value >> 8)
-            self.array.insert(self.offset + 2, value >> 16)
-        self.offset += 3
-        return self.toString()
+    def writeUnsignedByte(self, value):
+        buf = self.__packStream("B", value)
+        self.__writeStream(buf)
 
-    def writeInt32(self, value):  # I don't know why but Little endian bytes go to the fifth offset in the byte stream? This also seems to be the same in Node.js
-        value = +value
-        self.offset = self.offset >> 0
-        if self.endian == 0:
-            self.array.insert(self.offset, value >> 24)
-            self.array.insert(self.offset + 1, value >> 16)
-            self.array.insert(self.offset + 2, value >> 8)
-            self.array.insert(self.offset + 3, value & 0xff)
-            self.offset += 4
-        else:
-            self.offset += 4
-            self.array.insert(self.offset, value & 0xFF)
-            self.array.insert(self.offset + 1, value >> 8)
-            self.array.insert(self.offset + 2, value >> 16)
-            self.array.insert(self.offset + 3, value >> 24)
-        return self.toString()
+    def writeShort(self, value):
+        buf = self.__packStream("h", value)
+        self.__writeStream(buf)
 
-    def writeInt40(self, value):
-        value = +value
-        self.offset = self.offset >> 0
-        self.offset += 1  # writeInt8
-        self.writeInt32(int(value))
-        return self.toString()
+    def writeUnsignedShort(self, value):
+        buf = self.__packStream("H", value)
+        self.__writeStream(buf)
 
-    def writeInt48(self, value):
-        value = +value
-        self.offset = self.offset >> 0
-        self.offset += 2  # writeInt16
-        self.writeInt32(int(value))
-        return self.toString()
+    def writeLong(self, value):
+        buf = self.__packStream("l", value)
+        self.__writeStream(buf)
 
-    def writeInt56(self, value):
-        value = +value
-        self.offset = self.offset >> 0
-        self.offset += 3  # writeInt24
-        self.writeInt32(int(value))
-        return self.toString()
+    def writeUnsignedLong(self, value):
+        buf = self.__packStream("L", value)
+        self.__writeStream(buf)
 
-    def writeInt64(self, value):  # The byte does not get overwritten in the byte stream, because we use Int32 twice with the same offset (4+4=8)
-        value = +value
-        self.offset = self.offset >> 0
-        if self.endian == 0:
-            high = math.floor(int(value / 0x100000000))
-            low = value - high * 0x100000000
-            self.writeInt32(int(high))
-            self.writeInt32(int(low))
-        else:
-            SHIFT_RIGHT_32 = 1 / (1 << 16) * (1 << 16)
-            if value < 0x8000000000000000:
-                self.writeInt32(int(value & -1))
-                self.writeInt32(int(math.floor(value * SHIFT_RIGHT_32)))  # Kills any float values
-        return self.toString()
+    def writeInt(self, value):
+        buf = self.__packStream("i", value)
+        self.__writeStream(buf)
 
-    def readInt8(self):
-        self.offset = self.offset >> 0
-        return self.array[self.offset-1]
+    def writeUnsignedInt(self, value):
+        buf = self.__packStream("I", value)
+        self.__writeStream(buf)
 
-class ByteArray:
-    def __init__(this, bytes=""):
-        this.bytes = bytes
+    def writeInt64(self, value):
+        buf = self.__packStream("q", value)
+        self.__writeStream(buf)
 
-    def isUnicode(this, value):
-        if type(value) == unicode:
+    def writeUnsignedInt64(self, value):
+        buf = self.__packStream("Q", value)
+        self.__writeStream(buf)
+
+    def writeFloat(self, value):
+        buf = self.__packStream("f", value)
+        self.__writeStream(buf)
+
+    def writeDouble(self, value):
+        buf = self.__packStream("d", value)
+        self.__writeStream(buf)
+
+    def writeUTF(self, value):
+        self.writeShort(len(value))
+        self.writeUTFBytes(value)
+
+    def writeUTFBytes(self, value):
+        if isinstance(value, unicode):
             value = value.encode("utf-8")
-            return value
-        pass
+        buf = self.__packStream("%ds"%len(value), value)
+        self.__writeStream(buf)
 
-    def writeByte(this, value):
-        this.isUnicode(value)
-        this.bytes += pack("!b", int(value)) # Offset: 1
-        return this.bytes
+    def writeMulitiBytes(self, bytes, begin=0, nlen=-1):
+        bytes.setPosition(begin)
+        if nlen == -1:
+            nlen = self.availableSizes
+        buf = bytes.readBytes(nlen)
+        self.writeBytes(buf)
 
-    def writeUnsignedByte(this, value):
-        this.isUnicode(value)
-        this.bytes += pack("!B", int(value)) # Offset: 1
-        return this.bytes
+    def writeBytes(self, value):
+        self.__writeStream(value)
 
-    def writeShort(this, value):
-        this.isUnicode(value)
-        this.bytes += pack("!h", int(value)) # Offset: 2
-        return this.bytes
+    def writeChar(self, value):
+        if len(value) != 1:
+            raise ByteArrayException,"Write char only accept bytes of length 1"
+        self.__writeStream(value)
 
-    def writeUnsignedShort(this, value):
-        this.isUnicode(value)
-        this.bytes += pack("!H", int(value)) # Offset: 2
-        return this.bytes
+    def writeBytesWithLength(self, value):
+        if not value:
+            self.writeUnsignedInt(0xffffffff)
+            return
+        self.writeUnsignedInt(len(value))
+        self.__writeStream(value)
 
-    def writeInt(this, value):
-        this.isUnicode(value)
-        this.bytes += pack("!i", int(value)) # Offset: 4
-        return this.bytes
-
-    def writeUnsignedInt(this, value):
-        this.isUnicode(value)
-        this.bytes += pack("!I", int(value)) # Offset: 4
-        return this.bytes
-
-    def writeBoolean(this, value):
-        this.isUnicode(value)
-        this.bytes += pack("!?", int(value)) # Offset: 1
-        return this.bytes
-
-    def writeUTF(this, value):
-        this.isUnicode(value)
-        value = str(value)
-        size = len(value)
-        this.writeShort(size) # Offset: 2
-        this.write(value) # Offset: 2 + 1 = 3
-        return this.bytes
-
-    def writeUTFBytes(this, value, size):
-        this.isUnicode(value)
-        for data in str(pack("!b", 0)) * int(size):
-            if len(value) < int(size):
-                value = value + pack("!b", 0)
-        this.write(value)
-        return this.bytes
-
-    def writeBytes(this, value):
-        this.bytes += value
-        return this.bytes
-
-    def write(this, value):
-        this.bytes += value
-
-    def readByte(this):
-        value = unpack('!b', this.bytes[:1])[0]
-        this.bytes = this.bytes[1:]
-        return value
-
-    def readUnsignedByte(this):
-        value = unpack('!B', this.bytes[:1])[0]
-        this.bytes = this.bytes[1:]
-        return value
-
-    def readShort(this):
-        value = unpack('!h', this.bytes[:2])[0]
-        this.bytes = this.bytes[2:]
-        return value
-
-    def readUnsignedShort(this):
-        value = unpack('!H', this.bytes[:2])[0]
-        this.bytes = this.bytes[2:]
-        return value
-
-    def readInt(this):
-        value = unpack('!i', this.bytes[:4])[0]
-        this.bytes = this.bytes[4:]
-        return value
-
-    def readUnsignedInt(this):
-        value = unpack('!I', this.bytes[:4])[0]
-        this.bytes = this.bytes[4:]
-        return value
-
-    def readUTF(this):
-        size = unpack('!h', this.bytes[:2])[0]
-        value = this.bytes[2:2 + size]
-        this.bytes = this.bytes[size + 2:]
-        return value
-
-    def readBoolean(this):
-        value = unpack('!?', this.bytes[:1])[0]
-        this.bytes = this.bytes[1:]
-        return (True if value == 1 else False)
-
-    def readUTFBytes(this, size):
-        value = this.bytes[:int(size)]
-        this.bytes = this.bytes[int(size):]
-        return value
-
-    def getLength(this):
-        return len(this.bytes)
-
-    def bytesAvailable(this):
-        return len(this.bytes) > 0
-
-    def toByteArray(this):
-        return this.bytes
-
-b = Buffer()
-b.writeInt40(1)
+    def writeString(self, value):
+        if not value:
+            self.writeBytesWithLength(b"")
+            return
+        if self.endian == ByteArray.BIG_ENDIAN:
+            self.writeBytesWithLength(value.encode("utf-16be"))
+        else:
+            self.writeBytesWithLength(value.encode("utf-16le"))
