@@ -286,3 +286,42 @@ class ByteArray(Exception):
             self.writeBytesWithLength(value.encode("utf-16be"))
         else:
             self.writeBytesWithLength(value.encode("utf-16le"))
+
+    def writeInt24(self, value):
+        high = math.floor(value / 0x10000)
+        low = value - high * 0x10000
+        offset = self.position
+        self.writeByte(high)
+        self.writeUnsignedShort(low)
+        offset + 3
+        print(self.convertStream())
+
+    def writeInt40(self, value):
+        high = math.floor(value / 0x100000000)
+        low = value - high * 0x100000000
+        offset = self.position
+        self.writeByte(high)
+        self.writeUnsignedInt(low)
+        offset + 5
+        print(self.convertStream())
+
+    def writeInt48(self, value):
+        high = math.floor(value / 0x100000000)
+        low = value - high * 0x100000000
+        offset = self.position
+        self.writeShort(high)
+        self.writeUnsignedInt(low)
+        offset + 6
+        print(self.convertStream())
+
+    def writeInt56(self, value):
+        temp = math.floor(value / 0x100000000)
+        high = math.floor(temp / 0x10000)
+        mid = temp - high * 0x10000
+        low = value - temp * 0x100000000
+        offset = self.position
+        self.writeByte(high)
+        self.writeUnsignedShort(mid)
+        self.writeUnsignedInt(low)
+        offset + 7
+        print(self.convertStream())
