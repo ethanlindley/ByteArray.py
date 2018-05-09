@@ -19,7 +19,7 @@ class ByteArray(Exception):
         self.availableSizes = 0
 
         if buf is None:
-            raise Exception("can"t read from empty byte stream")
+            raise ByteArrayException("can\'t read from empty byte stream")
         elif type(buf) == ByteArray:
             buf.setPosition(0)
             self.writeMulitiBytes(buf)
