@@ -1,11 +1,11 @@
 #-*-coding:utf-8-*-
-import struct
-import math
-import zlib
+import math, struct, zlib
+
 
 class ByteArrayException(Exception):
     def __init__(self, msg):
         Exception.__init__(self, msg)
+
 
 class ByteArray(Exception):
     LITTLE_ENDIAN = 0
@@ -18,8 +18,8 @@ class ByteArray(Exception):
         self.length = 0
         self.availableSizes = 0
 
-        if not buf:
-            pass
+        if buf is None:
+            raise ByteArrayException("can\'t read from empty byte stream")
         elif type(buf) == ByteArray:
             buf.setPosition(0)
             self.writeMulitiBytes(buf)
@@ -42,7 +42,7 @@ class ByteArray(Exception):
     def __readStream(self, size):
         buf = ""
         if self.availableSizes < size:  # If you have issues with this error, comment it out
-            raise ByteArrayException,"availableSizes=%d,size=%d.stream availableSizes not endian%"%(self.availableSizes)
+            raise ByteArrayException("attempted to read with a size greater than length of byte stream")
         if size == 0:
             return buf
         buf = self.stream[self.position:self.position+size]
@@ -97,27 +97,27 @@ class ByteArray(Exception):
 
     def readByte(self):
         buf = self.__readStream(1)
-        res = self.__unpackStream('b', buf)
+        res = self.__unpackStream("b", buf)
         return res
 
     def readBoolean(self):
         buf = self.__readStream(1)
         res = self.__unpackStream("?", buf)
-        return (True if res == 1 else False)
+        return True if res == 1 else False
 
     def readUnsignedByte(self):
         buf = self.__readStream(1)
-        res = self.__unpackStream('B', buf)
+        res = self.__unpackStream("B", buf)
         return res
 
     def readShort(self):
         buf = self.__readStream(2)
-        res = self.__unpackStream('h', buf)
+        res = self.__unpackStream("h", buf)
         return res
 
     def readUnsignedShort(self):
         buf = self.__readStream(2)
-        res = self.__unpackStream('H', buf)
+        res = self.__unpackStream("H", buf)
         return res
 
     def readLong(self):
@@ -132,32 +132,32 @@ class ByteArray(Exception):
 
     def readInt(self):
         buf = self.__readStream(4)
-        res = self.__unpackStream('i', buf)
+        res = self.__unpackStream("i", buf)
         return res
 
     def readUnsignedInt(self):
         buf = self.__readStream(4)
-        res = self.__unpackStream('I', buf)
+        res = self.__unpackStream("I", buf)
         return res
 
     def readInt64(self):
         buf = self.__readStream(8)
-        res = self.__unpackStream('q', buf)
+        res = self.__unpackStream("q", buf)
         return res
 
     def readUnsignedInt64(self):
         buf = self.__readStream(8)
-        res = self.__unpackStream('Q', buf)
+        res = self.__unpackStream("Q", buf)
         return res
 
     def readFloat(self):
         buf = self.__readStream(4)
-        res = self.__unpackStream('f', buf)
+        res = self.__unpackStream("f", buf)
         return res
 
     def readDouble(self):
         buf = self.__readStream(8)
-        res = self.__unpackStream('d', buf)
+        res = self.__unpackStream("d", buf)
         return res
 
     def readUTF(self, nlen):
@@ -171,7 +171,7 @@ class ByteArray(Exception):
 
     def readMulitiBytes(self, bytes, begin=0, nlen=-1):
         if bytes.length < begin:
-            raise ByteArrayException,"Write ByteArray position out"
+            raise ByteArrayException("Write ByteArray position out")
         bytes.setPosition(begin)
         if nlen == -1:
             nlen = self.availableSizes
@@ -268,7 +268,7 @@ class ByteArray(Exception):
 
     def writeChar(self, value):
         if len(value) != 1:
-            raise ByteArrayException,"Write char only accept bytes of length 1"
+            raise ByteArrayException("Write char only accept bytes of length 1")
         self.__writeStream(value)
 
     def writeBytesWithLength(self, value):
