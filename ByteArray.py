@@ -1,11 +1,11 @@
 #-*-coding:utf-8-*-
-import struct
-import math
-import zlib
+import math, struct, zlib
+
 
 class ByteArrayException(Exception):
     def __init__(self, msg):
         Exception.__init__(self, msg)
+
 
 class ByteArray(Exception):
     LITTLE_ENDIAN = 0
@@ -18,8 +18,8 @@ class ByteArray(Exception):
         self.length = 0
         self.availableSizes = 0
 
-        if not buf:
-            pass
+        if buf is None:
+            raise Exception("can't read from empty byte stream")
         elif type(buf) == ByteArray:
             buf.setPosition(0)
             self.writeMulitiBytes(buf)
@@ -42,7 +42,7 @@ class ByteArray(Exception):
     def __readStream(self, size):
         buf = ""
         if self.availableSizes < size:  # If you have issues with this error, comment it out
-            raise ByteArrayException,"availableSizes=%d,size=%d.stream availableSizes not endian%"%(self.availableSizes)
+            raise ByteArrayException("attempted to read with a size greater than length of byte stream")
         if size == 0:
             return buf
         buf = self.stream[self.position:self.position+size]
@@ -171,7 +171,7 @@ class ByteArray(Exception):
 
     def readMulitiBytes(self, bytes, begin=0, nlen=-1):
         if bytes.length < begin:
-            raise ByteArrayException,"Write ByteArray position out"
+            raise ByteArrayException("Write ByteArray position out")
         bytes.setPosition(begin)
         if nlen == -1:
             nlen = self.availableSizes
@@ -268,7 +268,7 @@ class ByteArray(Exception):
 
     def writeChar(self, value):
         if len(value) != 1:
-            raise ByteArrayException,"Write char only accept bytes of length 1"
+            raise ByteArrayException("Write char only accept bytes of length 1")
         self.__writeStream(value)
 
     def writeBytesWithLength(self, value):
